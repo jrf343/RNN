@@ -1,4 +1,4 @@
-from Layer import Layer
+from .Layer import Layer
 import numpy as np
 
 class TanhLayer(Layer):
@@ -13,20 +13,24 @@ class TanhLayer(Layer):
         # g(z) = (e^(z) - e^(-z)) / (e^(z) + e^(-z))
         output = np.tanh(dataIn)
         
-        self.setPrevIn(dataIn)
-        self.setPrevOut(output)
+        # self.setPrevIn(dataIn)
+        # self.setPrevOut(output)
+
+        ## ADDED FOR RNN FUNCTIONALITY ##
+        self.addPrevIn(dataIn)
+        self.addPrevOut(output)
         
         return output
     
     # Input: None
     # Output: Either an NxD matrix or an Nx(DxD) tensor
-    def gradient(self):
+    def gradient(self, t_inp):
         # The gradient of the hyperbolic tangent function is g'(z) = 1 - g(z)^2
-        tanh_output = self.getPrevOut()
+        tanh_output = self.getPrevOut()[t_inp]
         return 1 - tanh_output**2
  
     # Input: The backcoming gradient
     # Output: The updated gradient to be backpropagated   
-    def backward(self, gradIn):
+    def backward(self, gradIn, t_inp):
         # The backward gradient is the element-wise (Hadamard) product of the incoming gradient and the layer's gradient
-        return gradIn * self.gradient()
+        return gradIn * self.gradient(t_inp)

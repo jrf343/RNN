@@ -18,6 +18,20 @@ class Layer(ABC):
     def getPrevOut(self):
         return self.__prevOut
     
+    #-----ADDED FOR RNN FUNCTIONALITY-----#
+    def addPrevIn(self, dataIn):
+        self.__prevIn.append(dataIn)
+    
+    def accessPrevIn(self, index):
+        return self.__prevIn[index]
+    
+    def addPrevOut(self, dataOut):
+        self.__prevOut.append(dataOut)
+
+    def accessPrevOut(self, index):
+        return self.__prevOut[index]
+    #-----ADDED FOR RNN FUNCTIONALITY-----#
+    
     @abstractmethod
     def forward(self,dataIn):
         pass

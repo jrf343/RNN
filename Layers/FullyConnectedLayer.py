@@ -1,4 +1,4 @@
-from Layer import Layer
+from .Layer import Layer
 import numpy as np
 
 class FullyConnectedLayer(Layer):
@@ -8,7 +8,11 @@ class FullyConnectedLayer(Layer):
     def __init__ (self, sizeIn, sizeOut):
         super().__init__()
         self.weights = np.random.uniform(-1e-4, 1e-4, size=(sizeIn, sizeOut))
-        self.biases = np.random.uniform(-1e-4, 1e-4, size=(sizeOut, 1))
+        self.biases = np.random.uniform(-1e-4, 1e-4, size=(1, sizeOut))
+
+        ## ADDED FOR RNN FUNCTIONALITY ##
+        self.weights_grad_accum = np.zeros((sizeIn, sizeOut))
+        self.biases_grad_accum = np.zeros((1, sizeOut))
     
     # Input: None
     # Output: The sizeIn x sizeOut weight matrix
@@ -36,8 +40,22 @@ class FullyConnectedLayer(Layer):
         # y = xW + b
         output = np.dot(dataIn, self.weights) + self.biases
         
-        self.setPrevIn(dataIn)
-        self.setPrevOut(output)
+        # self.setPrevIn(dataIn)
+        # self.setPrevOut(output)
+
+        ## ADDED FOR RNN FUNCTIONALITY ##
+        self.addPrevIn(dataIn)
+        self.addPrevOut(output)
+        
+        return output
+    
+    ## ADDED FOR RNN FUNCTIONALITY ##
+    def forward_with_feedback(self, dataIn, feedback):
+        # y = xW + b
+        output = (np.dot(dataIn, self.weights) + self.biases) + feedback
+        
+        self.addPrevIn(dataIn)
+        self.addPrevOut(output)
         
         return output
     
@@ -53,11 +71,22 @@ class FullyConnectedLayer(Layer):
         gradOut = gradIn @ self.gradient()
         return gradOut
     
+    ## ADDED FOR RNN FUNCTIONALITY ##
+    def updateWeightsGradAccum(self, gradIn, t_inp):
+        self.weights_grad_accum += (self.getPrevIn()[t_inp].T @ gradIn)/gradIn.shape[0]
+
+    def updateBiasesGradAccum(self, gradIn):
+        self.biases_grad_accum += np.sum(gradIn, axis=0)/gradIn.shape[0]
+
+    
     # Input: The backcoming gradient
     # Output: None
     def updateWeights(self, gradIn, eta = 1e-4):
-        dJdb = np.sum(gradIn, axis = 0)/gradIn.shape[0]
-        dJdW = (self.getPrevIn().T @ gradIn)/gradIn.shape[0]
+        # dJdb = np.sum(gradIn, axis = 0)/gradIn.shape[0]
+        # dJdW = (self.getPrevIn().T @ gradIn)/gradIn.shape[0]
+
+        dJdW = self.weights_grad_accum
+        dJdb = self.biases_grad_accum
         
         newWeights = self.getWeights() - (eta * dJdW)
         newBiases = self.getBiases() - (eta * dJdb)
