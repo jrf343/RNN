@@ -1,4 +1,5 @@
 import numpy as np
+np.random.seed(0)
 
 class SquaredError():
     # Input: Y is an N by K matrix of target values.

@@ -1,5 +1,6 @@
 from .Layer import Layer
 import numpy as np
+np.random.seed(0) # For reproducibility
 
 class TanhLayer(Layer):
     # Input: None

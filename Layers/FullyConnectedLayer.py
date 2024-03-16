@@ -1,14 +1,19 @@
 from .Layer import Layer
 import numpy as np
+np.random.seed(0) # For reproducibility
 
 class FullyConnectedLayer(Layer):
     # Input: sizeIn, the number of features of data coming in
     # Input: sizeOut, the number of features for the data coming out
     # Output: None
-    def __init__ (self, sizeIn, sizeOut):
+    def __init__ (self, sizeIn, sizeOut, random=True, randstate=0):
         super().__init__()
-        self.weights = np.random.uniform(-1e-4, 1e-4, size=(sizeIn, sizeOut))
-        self.biases = np.random.uniform(-1e-4, 1e-4, size=(1, sizeOut))
+        if(random):
+            self.weights = np.random.uniform(-1e-4, 1e-4, size=(sizeIn, sizeOut))
+            self.biases = np.random.uniform(-1e-4, 1e-4, size=(1, sizeOut))
+        else:
+            self.weights = np.random.RandomState(randstate).uniform(-1e-4, 1e-4, size=(sizeIn, sizeOut))
+            self.biases = np.random.RandomState(randstate+10).uniform(-1e-4, 1e-4, size=(1, sizeOut))
 
         ## ADDED FOR RNN FUNCTIONALITY ##
         self.weights_grad_accum = np.zeros((sizeIn, sizeOut))

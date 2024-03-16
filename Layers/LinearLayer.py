@@ -1,5 +1,6 @@
 from .Layer import Layer
 import numpy as np
+np.random.seed(0)
 
 class LinearLayer(Layer):
     # Input: None
