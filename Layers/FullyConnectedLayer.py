@@ -38,6 +38,13 @@ class FullyConnectedLayer(Layer):
     # Ouput: None
     def setBiases(self, biases):
         self.biases = biases
+
+    ## ADDED FOR RNN FUNCTIONALITY ##
+    def reset(self):
+        self.weights_grad_accum = np.zeros(self.weights.shape)
+        self.biases_grad_accum = np.zeros(self.biases.shape)
+        self.setPrevIn([])
+        self.setPrevOut([])
     
     # Input: dataIn, an NxD matrix 
     # Output: an NxD matrix 
