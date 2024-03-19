@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
+from scipy.stats import ttest_ind
 # import pickle as pkl
 np.random.seed(0)
 
@@ -305,6 +306,29 @@ def get_df_val_RMSEs(model, years_train):
 
     return pd.DataFrame(val_testing_dict)
 
+'''
+Given a dataframe of validation RMSEs, plot a bar graph comparing the RMSEs for each year.
+'''
+def bar_graph_val_RMSEs_compare(df_val_RMSEs_inp):
+    fig, ax = plt.subplots(figsize=(12, 8), facecolor="white")
+
+    avg_rmse = np.mean(df_val_RMSEs_inp["rmse"])
+    stdev_rmse = np.std(df_val_RMSEs_inp["rmse"])
+
+    for act_func in df_val_RMSEs_inp["act_func"].unique():
+        df_act_func = df_val_RMSEs_inp[df_val_RMSEs_inp["act_func"] == act_func]
+        ax.bar(df_act_func["predict_range"], df_act_func["rmse"], label=act_func)
+    # ax.bar(df_val_RMSEs_inp["predict_range"], df_val_RMSEs_inp["rmse"])
+    ax.set_xlabel("Year", fontsize=14)
+    ax.set_ylabel("RMSE ($^\circ$C)", fontsize=14)
+    ax.set_title("Validation RMSEs of Average Monthly Temp. Predictions", fontsize=16)
+    ax.tick_params(axis="x", labelsize=14)
+    ax.tick_params(axis="y", labelsize=14)
+    ax.legend(fontsize=11)
+
+    plt.xticks(rotation=60)
+    plt.show()
+
 ###----------------- Load Data -----------------###
 df = load_data("./Data/PhiladelphiaLandTemperatures.csv")
 years_train = [1980, 1983, 1990, 1993, 2000, 2003]
@@ -331,7 +355,7 @@ df_error_vs_epochs_compare = pd.concat([pd.DataFrame(training_results_tanh_batch
 
 act_funcs = df_error_vs_epochs_compare['act_func'].unique()
 
-fig, ax = plt.subplots(figsize=(10, 6), facecolor="white")
+fig1, ax = plt.subplots(figsize=(10, 6), facecolor="white")
 
 markers = ["o", "x"]
 
@@ -350,26 +374,35 @@ ax.legend(fontsize=12)
 plt.show()
 
 ###----------------- Train "Optimal" Tanh -----------------###
-lr = lr_tanh
+print("Parameters for 'optimal' models:")
+
+fcl_size = 20
+output_size = y_train[0].shape[0]
+print(f"FCL size: {fcl_size}")
+
+num_epochs_tanh = 100
+print(f"Number of epochs for Tanh: {num_epochs_tanh}")
 
 # Assume scaling by X_train[0] is sufficient for all batches
-rnn_tanh_batches = make_RNN(X_inp = X_train[0], fcl_size=20, output_size=y_train[0].shape[0])
-training_results_tanh_batches = train_RNN_inplace_with_batches_for(rnn_tanh_batches, X_train, y_train, learning_rate=lr, epochs=100+1)
+rnn_tanh_batches = make_RNN(X_inp = X_train[0], fcl_size=fcl_size, output_size=output_size) # uses tanh by default for act_func
+training_results_tanh_batches = train_RNN_inplace_with_batches_for(rnn_tanh_batches, X_train, y_train, learning_rate=lr_tanh, epochs=num_epochs_tanh+1)
+
 y_preds_train_tanh, rmses_train_tanh = predict_batches(rnn_tanh_batches, X_train, y_train)
 
 ###----------------- Train "Optimal" ReLU -----------------###
-lr = lr_relu
+num_epochs_relu = 700
+print(f"Number of epochs for ReLU: {num_epochs_relu}")
 
 # Assume scaling by X_train[0] is sufficient for all batches
-rnn_relu_batches = make_RNN(X_inp = X_train[0], fcl_size=20, output_size=y_train[0].shape[0], act_func="relu")
-training_results_relu_batches = train_RNN_inplace_with_batches_for(rnn_relu_batches, X_train, y_train, learning_rate=lr_relu, epochs=700+1)
+rnn_relu_batches = make_RNN(X_inp = X_train[0], fcl_size=fcl_size, output_size=output_size, act_func="relu")
+training_results_relu_batches = train_RNN_inplace_with_batches_for(rnn_relu_batches, X_train, y_train, learning_rate=lr_relu, epochs=num_epochs_relu+1)
 
 y_preds_train_relu, rmses_train_relu = predict_batches(rnn_relu_batches, X_train, y_train)
 
 ###----------------- Plot Training Predictions and RMSE for "Optimal" Tanh and ReLU -----------------###
 ax_coords = [(0,0), (0,1), (1,0), (1,1), (2,0), (2,1)]
 
-fig, axs = plt.subplots(3, 2, figsize=(18, 18), facecolor="white")
+fig2, axs = plt.subplots(3, 2, figsize=(18, 18), facecolor="white") # Overall figure is large, mostly to accommodate title text size, font size, and subplot spacing
 for i in range(len(years_train)):
     year = years_train[i]
     train_slice = slices_train[i]
@@ -408,3 +441,105 @@ plt.subplots_adjust(hspace=0.5)
 plt.show()
 
 ###----------------- Compare RMSEs on Validation Sets-----------------###
+print()
+print("For validation set predictions:")
+df_val_RMSEs_tanh = get_df_val_RMSEs(rnn_tanh_batches, years_train)
+df_val_RMSEs_relu = get_df_val_RMSEs(rnn_relu_batches, years_train)
+
+df_val_RMSEs_tanh["act_func"] = "Tanh"
+df_val_RMSEs_relu["act_func"] = "ReLU"
+df_val_RMSEs_compare = pd.concat([df_val_RMSEs_tanh, df_val_RMSEs_relu])
+
+# Bar plot comparing RMSE for each year
+## Plotly will open in browser port
+fig3 = px.bar(df_val_RMSEs_compare,
+       x="predict_range",
+       y="rmse",
+       color="act_func",
+       template="simple_white",
+       labels={"predict_range": "Year", "rmse": "RMSE (°C)", "act_func": "Activation Function"},
+       barmode="group",
+       title="Validation RMSEs for Predicted Monthly Average Temperatures",
+       width=600,
+       height=400)
+
+fig3.update_layout(legend=dict(yanchor="top", xanchor="left", y=1.1, x=0.01))
+
+fig3.show()
+
+###----------------- Compare Average RMSE for Tanh and ReLU-----------------###
+rmse_avg_tanh = np.mean(df_val_RMSEs_tanh["rmse"])
+rmse_avg_relu = np.mean(df_val_RMSEs_relu["rmse"])
+rmse_stdev_tanh = np.std(df_val_RMSEs_tanh["rmse"])
+rmse_stdev_relu = np.std(df_val_RMSEs_relu["rmse"])
+
+print(f"Mean RMSE for Tanh RNN: {rmse_avg_tanh:.2f} +/- {rmse_stdev_tanh:.2f}")
+print(f"Mean RMSE for ReLU RNN: {rmse_avg_relu:.2f} +/- {rmse_stdev_relu:.2f}")
+print()
+
+rmse_dict = {"Activation Function": ["Tanh", "ReLU"],
+             "Average RMSE": [rmse_avg_tanh, rmse_avg_relu],
+             "Std. Dev. RMSE": [rmse_stdev_tanh, rmse_stdev_relu]}
+
+
+df_rmse_avg_compare = pd.DataFrame(rmse_dict)
+
+# Bar plot comparing RMSE +/- stdev for each activation function
+## Plotly will open in browser port
+fig4 = px.bar(df_rmse_avg_compare,
+       x="Activation Function",
+       y="Average RMSE",
+       color="Activation Function",
+       template="simple_white",
+       error_y="Std. Dev. RMSE",
+       title="Average RMSE Comparison of RNN Activation Functions",
+       labels={"Average RMSE": "Average RMSE (°C)",},
+    #    barmode="group",
+       width=600,
+       height=400)
+
+fig4.show()
+
+# Perform t-test comparison of average RMSE and print to console
+# Get the RMSE values for the Tanh and ReLU groups
+rmse_tanh_vals = df_val_RMSEs_compare[df_val_RMSEs_compare['act_func'] == 'Tanh']['rmse']
+rmse_relu_vals = df_val_RMSEs_compare[df_val_RMSEs_compare['act_func'] == 'ReLU']['rmse']
+
+t_statistic, p_value = ttest_ind(rmse_tanh_vals, rmse_relu_vals)
+
+print("Comparing average RMSEs of validation for Tanh and ReLU RNN:")
+print(f"T-Statistic: {t_statistic: .3f}")
+print(f"P-Value {p_value: .3f}")
+print()
+print("------------------")
+
+
+###----------------- Examine Early Stopping -----------------###
+print("Evaluate early stopping for Tanh and ReLU RNNs")
+#Tanh
+num_epochs_early_stop_tanh = 85
+# Assume scaling by X_train[0] is sufficient for all batches
+rnn_tanh_batches_early_stop = make_RNN(X_inp = X_train[0], fcl_size=fcl_size, output_size=output_size)
+training_results_tanh_batches_early_stop = train_RNN_inplace_with_batches_for(rnn_tanh_batches_early_stop, X_train, y_train, learning_rate=lr_tanh, 
+                                                                              epochs=num_epochs_early_stop_tanh + 1)
+y_preds_train_early_stop, rmses_train_early_stop = predict_batches(rnn_tanh_batches_early_stop, X_train, y_train)
+df_val_RMSEs_tanh_early_stop = get_df_val_RMSEs(rnn_tanh_batches_early_stop, years_train)
+
+tanh_early_stop_mean = df_val_RMSEs_tanh_early_stop["rmse"].mean()
+tanh_early_stop_stdev = df_val_RMSEs_tanh_early_stop["rmse"].std()
+
+print(f"Mean RMSE for Tanh RNN with early stopping ({num_epochs_early_stop_tanh} epochs): {tanh_early_stop_mean:.2f} +/- {tanh_early_stop_stdev:.2f}")
+
+#ReLU
+num_epochs_early_stop_relu = 595 # same proportion as Tanh, still where SE levels out
+# Assume scaling by X_train[0] is sufficient for all batches
+rnn_relu_batches_early_stop = make_RNN(X_inp = X_train[0], fcl_size=fcl_size, output_size=output_size, act_func="relu")
+training_results_relu_batches_early_stop = train_RNN_inplace_with_batches_for(rnn_relu_batches_early_stop, X_train, y_train, learning_rate=lr_relu, 
+                                                                              epochs=num_epochs_early_stop_relu + 1)
+y_preds_train_early_stop_relu, rmses_train_early_stop_relu = predict_batches(rnn_relu_batches_early_stop, X_train, y_train)
+df_val_RMSEs_relu_early_stop = get_df_val_RMSEs(rnn_relu_batches_early_stop, years_train)
+
+relu_early_stop_mean = df_val_RMSEs_relu_early_stop["rmse"].mean()
+relu_early_stop_stdev = df_val_RMSEs_relu_early_stop["rmse"].std()
+
+print(f"Mean RMSE for ReLU RNN with early stopping ({num_epochs_early_stop_relu} epochs): {relu_early_stop_mean:.2f} +/- {relu_early_stop_stdev:.2f}")
